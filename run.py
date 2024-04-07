@@ -38,12 +38,14 @@ def parse_args():
                         'choose the highest value that your GPU can handle', default=8)
     return parser.parse_args()
 
-def get_eval_dataset(model:str, images_path:str, batch_size:int, image_size:tuple=(224,224)):
+def get_eval_dataset(model:str, images_path:str, batch_size:int):
     """Gets a dataloader for our images folder respecting the selected backbone transformations"""
      # Load data config associated with the model to use in data augmentation pipeline
     data_config = timm.data.resolve_data_config({}, model=model, verbose=True)
     data_mean = data_config['mean']
     data_std = data_config['std']
+    image_size = data_config['input_size'][1:]
+    print(f'Image Size: {image_size}')
 
     eval_transforms = timm.data.create_transform(
         input_size=image_size, mean=data_mean, std=data_std
