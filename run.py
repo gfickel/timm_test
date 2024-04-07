@@ -72,3 +72,5 @@ if __name__ == '__main__':
 
     with open(os.path.join(args.output, 'results.json'), 'wt') as fid:
         json.dump(res, fid)
+
+    print(f'Extracted {len(res)} features, with feature size of {preds[0].shape}')
