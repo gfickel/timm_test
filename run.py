@@ -1,10 +1,11 @@
 import argparse
 import os
+import json
 
+import timm
 import torch
 from torch.utils.data import Dataset
-from torchvision.io import read_image
-import timm
+from PIL import Image
 
 
 class ImageFolderDataset(Dataset):
@@ -13,16 +14,16 @@ class ImageFolderDataset(Dataset):
         self.img_dir = img_dir
         self.transform = transform
         valid_extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']
-        self.img_list = [x for x in os.listdir(img_dir)
+        self.img_list = [os.path.join(img_dir, x) for x in os.listdir(img_dir)
                         if os.path.splitext(x)[1].lower() in valid_extensions]
 
     def __len__(self):
-        return len(self.img_labels)
+        return len(self.img_list)
 
     def __getitem__(self, idx):
         img_path = self.img_list[idx]
-        image = read_image(img_path)
-        image = self.transform(image)
+        with Image.open(img_path) as pil_im:
+            image = self.transform(pil_im.convert('RGB'))
         return image, os.path.basename(self.img_list[idx])
 
 
@@ -30,9 +31,9 @@ def parse_args():
     """Read and returns our input arguments """
     parser = argparse.ArgumentParser(
         'Run a batch of images on a timm backbone and save their features')
-    parser.add_argument('--images', help='Images path')
-    parser.add_argument('--output', help='Output path')
-    parser.add_argument('--backbone', help='timm backbone')
+    parser.add_argument('--images', help='Images path', required=True)
+    parser.add_argument('--output', help='Output path', required=True)
+    parser.add_argument('--backbone', help='timm backbone', required=True)
     parser.add_argument('--batch_size', type=int, help='Batch size. Usually it is better to '
                         'choose the highest value that your GPU can handle', default=8)
     return parser.parse_args()
@@ -54,10 +55,20 @@ def get_eval_dataset(model:str, images_path:str, batch_size:int, image_size:tupl
 
 if __name__ == '__main__':
     args = parse_args()
-    model = timm.create_model(args.backbone, pretrained=True)
+    # https://huggingface.co/docs/timm/en/feature_extraction#create-with-no-classifier
+    model = timm.create_model(args.backbone, pretrained=True, num_classes=0)
     eval_dataset = get_eval_dataset(args.backbone, args.images, args.batch_size)
 
+    os.makedirs(args.output, exist_ok=True)
+
+    model.eval()
+    res = {}
     for batch in eval_dataset:
         imgs, paths = batch
-        preds = model.forward_features(imgs)
-        print(preds[0], paths[0])
+        preds = model(imgs)
+
+        for idx in range(len(paths)):
+            res[paths[idx]] = preds[idx].tolist()
+
+    with open(os.path.join(args.output, 'results.json'), 'wt') as fid:
+        json.dump(res, fid)
