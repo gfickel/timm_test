@@ -7,6 +7,7 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class ImageFolderDataset(Dataset):
     """Simple dataloader that returns an image and its name """
@@ -64,10 +65,12 @@ if __name__ == '__main__':
     os.makedirs(args.output, exist_ok=True)
 
     model.eval()
+    model.to(DEVICE)
     res = {}
     for batch in eval_dataset:
         imgs, paths = batch
-        preds = model(imgs)
+        preds = model(imgs.to(DEVICE))
+        preds.to('cpu')
 
         for idx in range(len(paths)):
             res[paths[idx]] = preds[idx].tolist()
